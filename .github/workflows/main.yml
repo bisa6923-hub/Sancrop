@@ -1,0 +1,27 @@
+name: Build APK
+on: [push, workflow_dispatch]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Susun folder
+        run: |
+          mkdir -p app/src/main/java/com/sanadoy/croptop app/src/main/res/layout
+          for d in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
+            mkdir -p app/src/main/res/mipmap-$d
+            cp ic_launcher.png app/src/main/res/mipmap-$d/ic_launcher.png
+          done
+          mv MainActivity.kt Gemini.kt OverlayService.kt app/src/main/java/com/sanadoy/croptop/
+          mv activity_main.xml app/src/main/res/layout/
+          mv AndroidManifest.xml app/src/main/
+          mv app-build.gradle.kts app/build.gradle.kts
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 17 }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: "8.7" }
+      - run: gradle assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SanadoyCroptop-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
