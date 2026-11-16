@@ -35,13 +35,17 @@ class OverlayService : Service() {
 
     @Suppress("DEPRECATION")
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (intent?.action == "STOP") { stopSelf(); return START_NOT_STICKY }
         if (projection != null || intent == null) return START_NOT_STICKY
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(NotificationChannel("sc", "Sanadoy Croptop", NotificationManager.IMPORTANCE_LOW))
         val n = Notification.Builder(this, "sc")
             .setContentTitle("Sanadoy Croptop aktif")
-            .setContentText("Tombol melayang berjalan. Tekan lama tombol untuk menutup.")
-            .setSmallIcon(android.R.drawable.ic_menu_crop).build()
+            .setContentText("Tombol melayang berjalan. Tahan logo 1 detik atau tekan Tutup.")
+            .setSmallIcon(android.R.drawable.ic_menu_crop)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Tutup",
+                PendingIntent.getService(this, 0, Intent(this, OverlayService::class.java).setAction("STOP"), PendingIntent.FLAG_IMMUTABLE))
+            .build()
         if (Build.VERSION.SDK_INT >= 29)
             startForeground(1, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
         else startForeground(1, n)
@@ -79,17 +83,25 @@ class OverlayService : Service() {
         v.setImageResource(R.mipmap.ic_launcher)
         v.alpha = 0.92f
         var dx = 0f; var dy = 0f; var sx = 0; var sy = 0; var moved = false; var t0 = 0L
+        val closeRun = Runnable {
+            if (!moved) { Toast.makeText(this, "Tombol ditutup", Toast.LENGTH_SHORT).show(); stopSelf() }
+        }
         v.setOnTouchListener { _, e ->
             when (e.action) {
-                MotionEvent.ACTION_DOWN -> { dx = e.rawX; dy = e.rawY; sx = lp.x; sy = lp.y; moved = false; t0 = System.currentTimeMillis() }
+                MotionEvent.ACTION_DOWN -> {
+                    dx = e.rawX; dy = e.rawY; sx = lp.x; sy = lp.y; moved = false
+                    t0 = System.currentTimeMillis(); h.postDelayed(closeRun, 700)
+                }
                 MotionEvent.ACTION_MOVE -> {
                     val mx = e.rawX - dx; val my = e.rawY - dy
-                    if (Math.abs(mx) > 12 || Math.abs(my) > 12) moved = true
+                    if (Math.abs(mx) > 25 || Math.abs(my) > 25) { moved = true; h.removeCallbacks(closeRun) }
                     if (moved) { lp.x = (sx + mx).toInt(); lp.y = (sy + my).toInt(); wm.updateViewLayout(v, lp) }
                 }
-                MotionEvent.ACTION_UP -> if (!moved) {
-                    if (System.currentTimeMillis() - t0 > 700) stopSelf() else capture()
+                MotionEvent.ACTION_UP -> {
+                    h.removeCallbacks(closeRun)
+                    if (!moved && System.currentTimeMillis() - t0 < 700) capture()
                 }
+                MotionEvent.ACTION_CANCEL -> h.removeCallbacks(closeRun)
             }
             true
         }

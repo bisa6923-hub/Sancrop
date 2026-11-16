@@ -10,23 +10,37 @@ import java.net.URL
 import kotlin.concurrent.thread
 
 object Gemini {
+    private fun call(key: String, body: JSONObject): Pair<Int, String> {
+        val c = URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=$key")
+            .openConnection() as HttpURLConnection
+        c.connectTimeout = 15000; c.readTimeout = 60000
+        c.requestMethod = "POST"; c.doOutput = true
+        c.setRequestProperty("Content-Type", "application/json")
+        c.outputStream.use { it.write(body.toString().toByteArray()) }
+        val txt = (if (c.responseCode in 200..299) c.inputStream else c.errorStream).bufferedReader().readText()
+        return Pair(c.responseCode, txt)
+    }
+
     fun ask(key: String, bmp: Bitmap, cb: (String) -> Unit) {
         thread {
             val out = try {
+                val k = minOf(1f, 1024f / maxOf(bmp.width, bmp.height))
+                val small = if (k < 1f) Bitmap.createScaledBitmap(bmp, (bmp.width * k).toInt(), (bmp.height * k).toInt(), true) else bmp
                 val bo = ByteArrayOutputStream()
-                bmp.compress(Bitmap.CompressFormat.JPEG, 85, bo)
+                small.compress(Bitmap.CompressFormat.JPEG, 80, bo)
                 val b64 = Base64.encodeToString(bo.toByteArray(), Base64.NO_WRAP)
-                val body = JSONObject().put("contents", JSONArray().put(JSONObject().put("parts", JSONArray()
-                    .put(JSONObject().put("text", "Jawab soal pada gambar ini dalam bahasa Indonesia. Berikan jawaban akhir lebih dulu, lalu penjelasan singkat."))
-                    .put(JSONObject().put("inline_data", JSONObject().put("mime_type", "image/jpeg").put("data", b64))))))
-                val c = URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=$key")
-                    .openConnection() as HttpURLConnection
-                c.requestMethod = "POST"; c.doOutput = true
-                c.setRequestProperty("Content-Type", "application/json")
-                c.outputStream.use { it.write(body.toString().toByteArray()) }
-                val txt = (if (c.responseCode in 200..299) c.inputStream else c.errorStream).bufferedReader().readText()
-                if (c.responseCode !in 200..299) "Error ${c.responseCode}: $txt"
-                else JSONObject(txt).getJSONArray("candidates").getJSONObject(0)
+                fun body(fast: Boolean): JSONObject {
+                    val o = JSONObject().put("contents", JSONArray().put(JSONObject().put("parts", JSONArray()
+                        .put(JSONObject().put("text", "Jawab soal pada gambar. Tulis jawaban akhir dulu, lalu penjelasan sangat singkat. Bahasa Indonesia."))
+                        .put(JSONObject().put("inline_data", JSONObject().put("mime_type", "image/jpeg").put("data", b64))))))
+                    val g = JSONObject().put("maxOutputTokens", 800)
+                    if (fast) g.put("thinkingConfig", JSONObject().put("thinkingBudget", 0))
+                    return o.put("generationConfig", g)
+                }
+                var r = call(key, body(true))
+                if (r.first == 400) r = call(key, body(false))
+                if (r.first !in 200..299) "Error ${r.first}: ${r.second}"
+                else JSONObject(r.second).getJSONArray("candidates").getJSONObject(0)
                     .getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text")
             } catch (e: Exception) { "Gagal: ${e.message}" }
             cb(out)
