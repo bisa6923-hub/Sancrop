@@ -10,8 +10,8 @@ import java.net.URL
 import kotlin.concurrent.thread
 
 object Gemini {
-    private fun call(key: String, body: JSONObject): Pair<Int, String> {
-        val c = URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=$key")
+    private fun call(key: String, body: JSONObject, model: String): Pair<Int, String> {
+        val c = URL("https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$key")
             .openConnection() as HttpURLConnection
         c.connectTimeout = 15000; c.readTimeout = 60000
         c.requestMethod = "POST"; c.doOutput = true
@@ -37,8 +37,15 @@ object Gemini {
                     if (fast) g.put("thinkingConfig", JSONObject().put("thinkingBudget", 0))
                     return o.put("generationConfig", g)
                 }
-                var r = call(key, body(true))
-                if (r.first == 400) r = call(key, body(false))
+                var r = Pair(0, "")
+                loop@ for (m in listOf("gemini-flash-latest", "gemini-flash-lite-latest")) {
+                    for (i in 0..1) {
+                        r = call(key, body(true), m)
+                        if (r.first == 400) r = call(key, body(false), m)
+                        if (r.first !in listOf(500, 503, 429)) break@loop
+                        Thread.sleep(1500)
+                    }
+                }
                 if (r.first !in 200..299) "Error ${r.first}: ${r.second}"
                 else JSONObject(r.second).getJSONArray("candidates").getJSONObject(0)
                     .getJSONObject("content").getJSONArray("parts").getJSONObject(0).getString("text")
