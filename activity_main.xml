@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent">
+<LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+    android:orientation="vertical" android:padding="16dp">
+    <ImageView android:layout_width="96dp" android:layout_height="96dp"
+        android:layout_gravity="center" android:src="@mipmap/ic_launcher"/>
+    <EditText android:id="@+id/apiKey" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:hint="Gemini API Key (gratis dari aistudio.google.com)"
+        android:inputType="textPassword"/>
+    <Button android:id="@+id/btnOverlay" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:text="Aktifkan Tombol Melayang"/>
+    <Button android:id="@+id/btnPick" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:text="Pilih Screenshot Soal &amp; Crop"/>
+    <ImageView android:id="@+id/preview" android:layout_width="match_parent"
+        android:layout_height="200dp" android:scaleType="fitCenter"/>
+    <ProgressBar android:id="@+id/progress" android:layout_width="wrap_content"
+        android:layout_height="wrap_content" android:layout_gravity="center" android:visibility="gone"/>
+    <TextView android:id="@+id/answer" android:layout_width="match_parent"
+        android:layout_height="wrap_content" android:textSize="16sp" android:textIsSelectable="true"
+        android:paddingTop="12dp"/>
+</LinearLayout>
+</ScrollView>
